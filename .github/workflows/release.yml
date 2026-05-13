@@ -1,19 +1,42 @@
-name: Release Build
+name: Release Plugin
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
-  release:
-    types: [ published ]
+permissions:
+  contents: write
 
 jobs:
-  build:
-    uses: Crazy-Crew/.github/.github/workflows/build.yml@main
+  build-and-release:
+    runs-on: ubuntu-latest
 
-    with:
-      branch: main
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    secrets:
-      webhook: ${{ secrets.BUILD_WEBHOOK }}
-      modrinth_token: ${{ secrets.MODRINTH_TOKEN }}
-      hangar_token: ${{ secrets.HANGAR_KEY }}
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build plugin
+        run: ./gradlew build
+
+      - name: Generate tag
+        id: tag
+        run: echo "tag=v$(date +'%Y.%m.%d-%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            paper/build/libs/*.jar
+            build/libs/*.jar
